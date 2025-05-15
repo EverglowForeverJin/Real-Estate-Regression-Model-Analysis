@@ -27,7 +27,7 @@ library(grid)
 
 ## Loading
 ```{r}
-realEstate <- read.csv("D:/angelClass/ARclass/STAT_183/Individual/RealEstatePrice.csv") 
+realEstate <- read.csv("../data/RealEstatePrice.csv") 
 ```
 
 ```{r}
