@@ -1,0 +1,810 @@
+---
+title: "STAT183 Individual Project Report"
+author: "Chuqi(Angel) Jin"
+date: "2024-06-06"
+output:
+  pdf_document: default
+  html_document:
+    df_print: paged
+header-includes:
+- \usepackage{enumitem}
+- \setlist[itemize,1]{label=$\bullet$}
+- \setlist[itemize,2]{label=$\circ$}
+subtitle: Real Estate Sales Analysis
+---
+
+\newpage
+\Contents
+\Figures
+\Tables
+\newpage
+
+# Introduction
+
+## Background & Motivation
+Real estate has always been a popular and attention-grabbing issue. Real estate prices are also closely tied to and influenced by today's national economy, which includes mortgage rates, inflation, and unemployment rates. But what factors can affect the final sale price in a real estate transaction? Also, in past years of COVID-19 viral outbreaks, how did the real estate market react, and was it heavily influenced by the larger environment? 
+
+Understanding the elements that influence real estate pricing is crucial not only for prospective buyers, but it also allows real estate experts to provide better advice to sellers on how to get the most out of their property. Furthermore, as a graduating senior, the question of purchasing real estate for my future residence has become a challenge that I will have to face at some point. All of these reasons compelled me to delve deeply into the real estate property transactions dataset in order to figure out the impact of various factors on real estate selling prices and their significance through the use of multi-linear regression modeling.
+
+## Overall Goals 
+With the information and variables in the *RealEstatePrice.csv* datasets, I'd like to conduct a more in-depth analysis of this real estate transaction data in order to better understand what factors significantly influence real estate sale prices. I'd like to evaluate the following variables in the dataset: year, location, estimated value, sale price, type of property, residential status, room numbers, bathroom numbers, carpet area, property tax rate, and property facing direction. Using these variables, I want to build multi-linear regression models to determine which factors will impact on the real estate transaction's selling price.
+
+### Hypothesis
+The Year of the real estate transaction has a significant on the sale price
+
+# Data Description
+The dataset previously includes real estate transaction data from Connecticut between 2009 and 2022, with a total of 10,000 observations and 12 variables.
+
+* Remove 0 and NA values. 
+* Filter observations from 2017-2022.
+* Divided the *sale price* and *estimated values* by 1000.
+* Remove *Date* variables that duplicate the variable *Month*.
+
+After careful cleaning and selection, the dataset is reduced to 2574 observations and 12 variables. However, because each categorical variable has too many categorical types, I decided to include all categorical types in the EDA section but only the top two of each categorical variable in the final model building process. This resulted in a dataset of 397 variables and 12 variables for model building. 
+
+## Variables
+- *Year*: The property transaction year.
+- *Locality*: The property locality/area.
+- *Estimated.Value*: The estimated value of the property.
+- *Property*: Types of properties suitable for various family sizes.
+- *Residential*: Indicates whether the property is designated for residential use.
+- *num_rooms*: The number of rooms in the property.
+- *num_bathrooms*: The number of bathrooms in the property.
+- *carpet_area*: The carpet area of the property.
+- *property_tax_rate*: Tax rate applied to the property's assessed value.
+- *Face*: Direction the main entrance/facade of the property is oriented towards.
+- *Sale.Price*: The actual sale price of the property
+
+\begin{table}[h]
+\begin{center}
+\begin{tabular}{|c|c|c|c|c|c|}
+\hline 
+Variable & Unit & Type & Min & Max & SD\\
+\hline 
+year & / & numerical discrete & 2017 & 2022 & 1.701938\\
+\hline
+locality & bridgeport or waterbury & categorical & / & / & /\\
+\hline 
+estimated value & thousand dollars & numerical continuous & 12.34 & 13793.47 &  673.0124\\
+\hline
+property & single or two Family & categorical & / & / & /\\
+\hline
+residential & detached or duplex House & categorical & / & / & /\\
+\hline
+num rooms & / & numerical discrete & 3 & 8 & 0.8425566\\
+\hline
+num bathrooms & / & numerical discrete & 1 & 8 & 1.185482\\
+\hline
+carpet area & square feet & numerical continuous & 900 & 2989 & 290.6651\\
+\hline
+property tax rate & / & numerical continuous & 1.004 & 1.422 & 0.1746192\\
+\hline
+face & north or west & categorical & / & / & /\\
+\hline 
+sale price & thousand dollars & numerical continuous & 6.2 & 13900 & 944.8231\\
+\end{tabular}
+\end{center}
+\caption{Data Summary Statistics}
+\end{table}
+
+**NOTE:** The above variables are listed in their original form. Based on my findings, I may delete or transform variables in the latter sections.
+
+# Exploratory Data Analysis
+## Response variable: 
+The histogram of the response variables demonstrates that is not normally distributed and is heavily right-skewed
+
+## Predictor variables:
+All of the predictor variables are not normally distributed, with many being right-skewed. In terms of category variables, Bridgeport and Waterbury looked to have identical amounts of locality. A single-family has more property than a two-family unit. Detached houses are sold more frequently than duplex houses. The entryway facing north has slightly more than the one facing west. 
+
+## Predictors vs. Response: 
+Based on the plot, most numerical variables show an obvious pattern, but the *carpet area* does not; therefore, I will do additional analysis before deciding whether to include the variable in the final model or not. For categorical variables, the boxplot displays different medians, but the *face* shows approximately the same, thus I will consider transforming or eliminating the variables in the following phases. 
+
+## Multicollinearity analysis: 
+The plot depicts significant correlations between pairs of independent variables in the model. *num_rooms* and *num_bathrooms*, *carpet_area* and *num_rooms*, *carpet_area* and *num_bathrooms*, *property_tax_rate* and *Year*, these variables have values close to 1 or -1, indicating significant correlations. Because the majority of the correlation coefficients are relatively large, I decided to perform an additional variance inflation factor (VIF) calculation to double-check. When I check for VIF the first time with all variables, it shows that two variables, *Property* and *Residential* cannot be specified due to singularities, so I remove both of them and recalculate. After deleting two variables, the VIF scores for *num_rooms* and *carpet_area* remained more than 5. VIF scores larger than 5 indicate significant multicollinearity issues, so I removed *num_rooms* because its VIF score was higher than *carpet_area*. Finally, all of the VIF scores are less than 5, suggesting that there are no more significant multicollinearity issues, allowing me to go on to the model-building phase.
+
+# Model Building
+## Final Model: 
+$$ln(Y) = 2.660e^{-3}X_1 + 5.986e^{-3}X_2 - 7.913e^{-1}X_3 - 9.663e^{-1}X_4 
++ 6.516e^{-3}X_5 + \epsilon$$
+
+- $ln(Y)$ = *Sale price*
+
+- $X_1$ = *Year*
+* For every one unit increase in *Year*, log sale price increases by $2.660e^{-3}$ in thousand dollars
+
+- $X_2$ = *Estimated Value*
+* For every one unit increase in *Estimated value*, log sale price increases by $5.986e^{-3}$ in thousand dollars
+
+- $X_3$ = *Locality*
+* For every one time it changes from waterbury to  Bridgeport , the differences in the expected of decrease by $7.913e^{-1}$ in thousand dollars
+
+- $X_4$ = *Property Tax Rate*
+For every one unit increase in *property tax rate*, log sale price decreases by $9.663e^{-1}$ in thousand dollars
+
+- $X_4$ = *Estimated Value* * *Locality*
+* For every one unit increase in *locality * and *estimated value* interaction, log sale price increases by $6.516e^{-3}$ in thousand dollars
+
+
+## Process
+### Step 1: Forward stepwise model 
+The forward stepwise model, using all current variables, has an adjusted $R^2$ of 0.6187, explaining around 62% of the dataset. However, this model did not pass the normality, linearity, or constant variance residual assumptions, but it did pass the independence check. Also, not all the variables are significant, the *carpet_area* has p-value larger than 0.05, indicates it is not significant.
+
+### Step 2: Interaction
+To create a better model, I chose to look for interaction terms between categorical and numerical variables to improve fit. First, convert all categorical data to binary variables, assigning 1 to Waterbury and West, and 0 to Bridgeport and North. Then, using a scatter plot of predictors vs response variables, examine the interaction between categorical and numerical variables. The *estimated value* and *locality* are the scatter plots with obvious intersections and different slopes. 
+
+### Step 3: Model building before transaformation 
+- Model 1: Fitted with an interaction between *estimated value* and *locality* with intercept 0, this model failed to satisfy normality, and the scatter plot shows that *carpet_area* is the only one with no discernible pattern.
+
+- Model 2: Set model 1 residual as our new response variables; I put *year* into the model, but normality remained dissatisfied; the scatter plot this time did not reveal any new information beyond what we previously knew.
+
+### Step 4: Transformation.
+As a result, I chose to perform a logrithmic transformation on our response variables, *Sale Price*.
+
+### Step 5: Model Building following Transformation 
+- Model 1: Fitted between *estimated value* and *locality* with intercept 0, this model did not satisfy normality. Checking its scatter plot, after transformation, every variable exhibits substantial differences than before, indicating that our transformation works. However, *carpet_area*, *num_bathrooms*, and *face* no longer display any meaningful patterns.
+
+- Model 2: Using the residual of model 1 as response variables, I put *year* into the model again, but normality remained unmet, and the scatter plot this time revealed no new information other than what we previously knew. As a result, I chose to remove *carpet_area*, *num_bathrooms*, and *face*.
+
+- Model 3: Using selected variables, I proceed to build the full model. With the variables *Year*, *Locality*, *Estimated Value*, *Property Tax Rate*, and the interaction of *estimated value* and *locality*. This model met linearity and constant variance assumptions using the student Breusch-Pegan test and fitted vs. residuals scatter plot but did not meet independence and normality assumptions using the histogram, qq-plot, Shapiro-Wil test, or Durbin-Watson test. This model has an adjusted $R^2$ of 0.9886, indicating that it can interoperate with approximately 98.86% of the observations in my dataset. Also, all of the variables are significant.
+
+- Model 4: Using my entire model, I chose to create a simplified model to compare models. This model comprises all of the variables in their first order. This model met the linearity and constant variance assumptions but did not meet the independence and normalcy criteria. This model has an adjusted $R^2$ of 0.9879, indicating that it can interoperate with approximately 98.79% of the observations in my dataset. All the variables are significant, but Localicity is slightly less significant.
+
+- Model 5: The forward-step-wise model produces the same final model as model 3.
+
+## Model Comparison.
+Using the anova test, the p-value is quite small, indicating that those two models have a significant difference from the others, so we chose model 3, the full model, as our final model.
+
+- Model 3: Using selected variables, I proceed to build the full model. With the variables *Year*, *Locality*, *Estimated Value*, *Property Tax Rate*, and the interaction of *estimated value* and *locality*. This model met linearity and constant variance assumptions using the student Breusch-Pegan test and fitted vs. residuals scatter plot but did not meet independence and normality assumptions using the histogram, qq-plot, Shapiro-Wil test, or Durbin-Watson test. This model has an adjusted $R^2$ of 0.9886, indicating that it can interoperate with approximately 98.86% of the observations in my dataset. Also, all of the variables are significant. However, the VIF score now appears to be extremely high.
+
+# Conclusions and Discussions
+The final model I obtained has a very high adjusted R-squared. The final model suggests that a real estate sales price is influenced by the year, estimated value, locality, property tax rate, and the interaction of estimated value and location. Based on my hypothesis, I can conclude that the year of the real estate transaction has a significant effect on the sale price.
+
+Limitation: My final model does not satisfy the normality or independence assumptions, and it has a high VIF score with several variables, which could be due to my dataset being too small. As a result, for my future work, I'd like to collect additional observations, expand the dataset size, and rebuild the model to see if I can achieve better results for residual assumption checks.
+
+\newpage
+# Appendix
+```{r,message=FALSE,warning=FALSE, include=FALSE}
+library(tidyverse)
+library(lubridate)
+library(dplyr)
+library(ggplot2)
+library(gridExtra)
+library(GGally)
+library(car)
+library(mltools)
+library(data.table)
+library(fastDummies)
+library(lmtest)
+library(tidyr)
+library(grid)
+```
+
+## Data Loading
+```{r}
+realEstate <- read.csv(file.choose(), header = T)
+```
+
+## Data Cleaning
+```{r, message=FALSE, warning=FALSE}
+# Eliminate all the NAs and 0s
+realEstate[realEstate == ""] = NA
+realEstate[realEstate == "?"] = NA
+realEstate[realEstate == 0] = NA
+
+# Clean the data set with selected restrictions
+cleaned <- realEstate %>%
+  na.omit() %>%
+  filter(Year >= 2017) %>%
+  select("Year", "Locality", "Estimated.Value","Property", "Residential", 
+         "num_rooms", "num_bathrooms","carpet_area", "property_tax_rate", 
+         "Face", "Sale.Price")
+  
+
+# Divide by 1000 and change unit to thousand dollars
+cleaned$Estimated.Value <- as.numeric(as.character(cleaned$Estimated.Value)) / 1000
+cleaned$Sale.Price <- as.numeric(as.character(cleaned$Sale.Price)) / 1000
+```
+
+2574 observation
+
+## EDA 
+```{r, message=FALSE, warning=FALSE}
+summary(cleaned)
+```
+
+## Predictor variables
+### Year 
+```{r fig.cap="Year", message=FALSE, warning=FALSE}
+# Identify which year sells most
+p3 <- ggplot(cleaned, aes(x=Year)) + 
+  geom_histogram(fill = "#7d9ea2", color = "white", binwidth=1) +
+  labs(x = "Years", y = "count")
+p3
+```
+
+### Locality 
+```{r fig.cap="Locality", message=FALSE, warning=FALSE}
+# Identify which year sells most
+p4 <- ggplot(cleaned, aes(x=Locality, fill=Locality)) + 
+  geom_bar(width=1) +
+  labs(x = "Localities") +
+  coord_polar()+
+  theme(panel.background = element_blank())
+p4
+```
+
+Bridgeport and Waterbury are top 2 location of property transaction
+
+### Estimated value
+```{r fig.cap="Estimated Value", message=FALSE, warning=FALSE}
+p5 <-ggplot(cleaned, aes(x = Estimated.Value)) + 
+  geom_histogram(fill = "#7d9ea2", color="white")+
+  labs(x = "Estimated Value (in thousand dollars)") 
+p5
+```
+
+### Property
+```{r fig.cap="Property", message=FALSE, warning=FALSE}
+p7 <- ggplot(cleaned, aes(x = Property)) +
+  geom_bar(fill = "#7d9ea2", color="white")
+
+```
+Single family and two family are top 2 property types
+
+### Residential
+```{r fig.cap="Residential", message=FALSE, warning=FALSE}
+p8 <- ggplot(cleaned, aes(x = Residential)) +
+  geom_bar(fill = "#7d9ea2", color="white")
+  
+grid.arrange(p7,p8, ncol = 1)
+```
+Detached House and Duplex are the top 2
+
+### Number of rooms
+```{r fig.cap="Number of rooms", message=FALSE, warning=FALSE}
+p9 <- ggplot(cleaned, aes(x = num_rooms)) +
+  geom_histogram(fill = "#7d9ea2", color="white",binwidth = 1)+
+  labs(x = "Number of Rooms", y = "count")
+  
+```
+
+### Number of bathrooms
+```{r fig.cap="Number of bathrooms", message=FALSE, warning=FALSE}
+p10 <- ggplot(cleaned, aes(x = num_bathrooms)) +
+  geom_histogram(fill = "#d99b77", color="white",binwidth = 1)+
+  labs(x = "Number of Bathrooms", y = "count")
+grid.arrange(p9,p10, ncol = 1)
+```
+
+### Carpet area
+```{r fig.cap="Carpet Area", message=FALSE, warning=FALSE}
+p11 <- ggplot(cleaned, aes(x = carpet_area)) + 
+  geom_histogram(fill = "#d99b77", color="white", binwidth=300)+
+  labs(x = "Carpet Area (in square feet)", y = "count")
+p11
+```
+
+### Property tax rate 
+```{r fig.cap="Property Tax Rate", message=FALSE, warning=FALSE}
+p12 <- ggplot(cleaned, aes(x = property_tax_rate)) + 
+  geom_histogram(fill = "#d99b77", color="white", binwidth=0.25)+
+  labs(x = "Property Tax Rate", y = "count")
+p12
+```
+
+### Face
+```{r fig.cap="Face", message=FALSE, warning=FALSE}
+p13 <-ggplot(cleaned, aes(x = Face)) + 
+  geom_bar(fill = "#d99b77", color="white")
+p13
+```
+Top 2 are north and west
+
+## Response variable
+### Sale price
+```{r fig.cap="Sale Price", message=FALSE, warning=FALSE}
+p6 <-ggplot(cleaned, aes(x = Sale.Price)) + 
+  geom_histogram(fill = "#f26835", color="white")+
+  labs(x = "Sale Price (in thousand dollars)", y = "count") 
+p6
+```
+
+Not normally distributed, it's right skewed.
+
+```{r}
+# Subset useful data for model building
+modelData <- cleaned %>%
+  filter(Locality == "Bridgeport" | Locality == "Waterbury")%>%
+  filter(Property == "Single Family" | Property == "Two Family") %>%
+  filter(Residential == "Detached House" | Residential == "Duplex")%>%
+  filter(Face == "North" | Face == "West") 
+
+```
+The subset dataset contains 397 observations, 11 variables
+
+## Predictors vs. Response
+```{r fig.cap="Predictors vs. Response", message=FALSE, warning=FALSE}
+# create graphs between each predictor var and the response var
+s.year <- ggplot(modelData, aes(x = Year, y = Sale.Price)) +
+  geom_point(color = "#990066") 
+s.estivalue <- ggplot(modelData, aes(x = Estimated.Value, y = Sale.Price)) +
+  geom_point(color = "#990066") 
+s.numroom <- ggplot(modelData, aes(x = num_rooms, y = Sale.Price)) +
+  geom_point(color = "#990066") 
+s.numbath <- ggplot(modelData, aes(x = num_bathrooms, y = Sale.Price)) +
+  geom_point(color = "#990066") 
+s.caparea <- ggplot(modelData, aes(x = carpet_area, y = Sale.Price)) +
+  geom_point(color = "#990066") 
+s.proprate <- ggplot(modelData, aes(x = property_tax_rate, y = Sale.Price)) +
+  geom_point(color = "#990066") 
+
+box.property <- ggplot(modelData, aes(x = Property, y = Sale.Price)) +
+           geom_boxplot(color = "#990066", outlier.color = "red",
+                        outlier.shape = 4, outlier.size = 2) 
+box.residential <- ggplot(modelData, aes(x = Residential, y = Sale.Price)) +
+           geom_boxplot(color = "#990066", outlier.color = "red",
+                        outlier.shape = 4, outlier.size = 2) 
+box.Locality <- ggplot(modelData, aes(x = Locality, y = Sale.Price)) +
+           geom_boxplot(color = "#990066", outlier.color = "red",
+                        outlier.shape = 4, outlier.size = 2)
+box.face <- ggplot(modelData, aes(x = Face, y = Sale.Price)) +
+           geom_boxplot(color = "#990066", outlier.color = "red",
+                        outlier.shape = 4, outlier.size = 2)
+
+# divide the frame in grid using grid.arrange() and put above plots in it
+grid.arrange(s.estivalue, s.numroom, s.numbath, s.caparea, s.proprate,
+             s.year, box.property, box.property, box.residential, box.Locality,
+             box.face, ncol = 3)
+```
+
+## Multicollinearity Analysis
+```{r fig.cap="Pairwise Comparison of the Original Data", message=FALSE, warning=FALSE}
+ggpairs(modelData) + theme(axis.text.x = element_text(size = 5, angle = 90),
+                           axis.text.y = element_text(size = 5),
+                           strip.text.y = element_text(angle = 0))
+```
+
+```{r}
+# All predictors (1st attempt)
+property.mlr <- lm(Sale.Price ~ Year+Locality+Estimated.Value+num_rooms+
+                     Property+num_bathrooms+carpet_area+property_tax_rate+
+                     Face+Residential, data = modelData)
+
+summary(property.mlr)
+# Can not do the vif
+# vif(property.mlr)
+```
+
+```{r}
+# Remove property and residential (2nd attempts)
+property1.mlr <- lm(Sale.Price ~ Year+Locality+Estimated.Value+num_rooms+
+                      num_bathrooms+carpet_area+
+                      property_tax_rate+Face, data = modelData)
+
+summary(property1.mlr)
+vif(property1.mlr)
+```
+
+```{r}
+# remove num_rooms (3rd attempts)
+property2.mlr <- lm(Sale.Price ~ Year+Locality+Estimated.Value+num_bathrooms+
+                      carpet_area+property_tax_rate+Face, data = modelData)
+
+summary(property2.mlr)
+vif(property2.mlr)
+```
+No more multicollinearity, all less than 5
+
+```{r}
+# Model building dataset
+modelbuilding <- subset(modelData, select = c("Year", "Locality", 
+                                              "Estimated.Value"
+                                        , "num_bathrooms", "carpet_area", 
+                                        "property_tax_rate", 
+                                      "Face", "Sale.Price"))
+
+```
+
+397 obs with 8 variables
+
+## Model Building
+### Forward Stepwise Regression 
+```{r, message=FALSE, warning=FALSE}
+# perform stepwise regression using the original data set
+
+# specify the null model with no predictor
+original.null <- lm(Sale.Price ~ 1, data = modelbuilding)
+# specify the full model using all of the potential predictors
+original.full <- lm(Sale.Price ~ ., data = modelbuilding)
+# use the stepwise algorithm to build a parsimonious model
+original.step <- step(original.null,
+                      scope = list(lower = original.null, 
+                                   upper = original.full),
+                      direction = "both", test = "F")
+
+summary(original.step)
+```
+
+### Residual Diagnostics
+```{r fig.cap="Linearity Assumption", message=FALSE, warning=FALSE}
+# check linearity
+ggplot(data = original.step, aes(x = .fitted, y = .resid)) +
+  geom_point(alpha = 0.5, color = "darkblue") +
+  geom_hline(yintercept = 0, color = "red", linetype = "dashed") +
+  labs(x = "Predicted Values", y = "Residuals")
+
+# predictor: Estimated.Value
+l.ev <- ggplot(data = original.step, aes(x = Estimated.Value, y = .resid)) +
+  geom_point(alpha = 0.5, color = "darkblue") +
+  geom_hline(yintercept = 0, color = "red", linetype = "dashed") +
+  labs(x = "Estimated.Value", y = "Residuals")
+
+# predictor: Year
+l.year <- ggplot(data = original.step, aes(x = Year, y = .resid)) +
+  geom_point(alpha = 0.5, color = "darkblue") +
+  geom_hline(yintercept = 0, color = "red", linetype = "dashed") +
+  labs(x = "Years", y = "Residuals")
+
+# predictor: Locality
+l.Local <- ggplot(data = original.step, aes(x = Locality, y = .resid)) +
+  geom_point(alpha = 0.5, color = "darkblue") +
+  geom_hline(yintercept = 0, color = "red", linetype = "dashed") +
+  labs(x = "Locality", y = "Residuals")
+
+# predictor: Carpet Area
+l.cap <- ggplot(data = original.step, aes(x = carpet_area, y = .resid)) +
+  geom_point(alpha = 0.5, color = "darkblue") +
+  geom_hline(yintercept = 0, color = "red", linetype = "dashed") +
+  labs(x = "Carpet Area", y = "Residuals")
+
+grid.arrange(l.ev, l.year, l.Local, l.cap, ncol = 2, nrow = 2)
+```
+not passed
+
+```{r fig.cap="Constant Variance Assumption", message=FALSE, warning=FALSE}
+# check constant variance
+bptest(original.step)
+```
+not passed
+
+```{r fig.cap="Normality Assumption", message=FALSE, warning=FALSE}
+# check normality 
+ggplot(data = original.step, aes(x = .resid)) + 
+  geom_histogram(fill = "darkblue", color = "white") +
+  labs(x = "Sale price (in thousand dollars)", y = "count")
+
+qqnorm(resid(original.step))
+qqline(resid(original.step))
+
+shapiro.test(resid(original.step))
+```
+Even though the histogram looks bell shaped, the qq-plot and Shapiro-Wilk normality test indicates the normality assumption is not satisfied.
+
+```{r fig.cap="Independece Assumption", message=FALSE, warning=FALSE}
+# check independence
+durbinWatsonTest(original.step)
+```
+p-value > 0.05, therefore, independence assumption is satisfied
+
+### Interaction
+```{r, message=FALSE, warning=FALSE}
+
+sp <- modelbuilding$Sale.Price
+year <- modelbuilding$Year
+ev <- modelbuilding$Estimated.Value
+nb <- modelbuilding$num_bathrooms
+ca <- modelbuilding$carpet_area
+ptr <- modelbuilding$property_tax_rate
+
+# create dummy variables for each cat var
+L <- ifelse(modelbuilding$Locality == "Waterbury", 1, 0)
+face <- ifelse(modelbuilding$Face == "West", 1, 0)
+```
+
+```{r fig.cap="Initial Plots of Predictor vs. Response Variables", message=FALSE, warning=FALSE}
+# check the relationship between each predictor var and rev
+a <- ggplot(modelbuilding, aes(x = Year, y = sp)) +
+  geom_point(color = "darkblue") 
+
+b <- ggplot(modelbuilding, aes(x = Estimated.Value, y = sp)) +
+  geom_point(color = "darkblue") 
+ 
+c <- ggplot(modelbuilding, aes(x = num_bathrooms, y = sp)) +
+  geom_point(color = "darkblue") 
+
+d <- ggplot(modelbuilding, aes(x = carpet_area, y = sp)) +
+  geom_point(color = "darkblue") 
+
+e <- ggplot(modelbuilding, aes(x = property_tax_rate, y = sp)) +
+  geom_point(color = "darkblue") 
+
+f <- ggplot(modelbuilding, aes(x = Locality, y = sp)) +
+  geom_point(color = "darkblue") 
+
+g <- ggplot(modelbuilding, aes(x = Face, y = sp)) +
+  geom_point(color = "darkblue") 
+
+# divide the frame in grid using grid.arrange() and put above plots in it
+grid.arrange(a, b, c, d, e, f, g, ncol = 3, nrow = 3)
+```
+
+```{r fig.cap="Interaction", message=FALSE, warning=FALSE}
+# check interaction between 
+plot(ev, sp, type = "n")
+points(ev[L == 0], sp[L == 0], col="red")
+points(ev[L == 1], sp[L == 1], col="green")
+```
+### Model Building before transformation
+#### Model 1
+```{r fig.cap="Model 1", message=FALSE, warning=FALSE}
+lm1 <- lm(sp ~ 0 + ev * L)
+y1 <- lm1$residuals
+
+# Check normality
+ggplot(modelbuilding, aes(x = y1))+
+  geom_histogram(fill = "darkblue", color = "white") +
+  labs(x = "Sale price (in thousand dollars)", y = "count")
+qqnorm(y1)
+qqline(y1)
+shapiro.test(y1)
+```
+
+```{r fig.cap="Model 1 Predictor vs. Response", message=FALSE, warning=FALSE}
+# check the relationship between each predictor variable and y1
+a <- ggplot(modelbuilding, aes(x = Year, y = y1)) +
+  geom_point(color = "darkblue") 
+
+b <- ggplot(modelbuilding, aes(x = Estimated.Value, y = y1)) +
+  geom_point(color = "darkblue") 
+ 
+c <- ggplot(modelbuilding, aes(x = num_bathrooms, y = y1)) +
+  geom_point(color = "darkblue") 
+
+d <- ggplot(modelbuilding, aes(x = carpet_area, y = y1)) +
+  geom_point(color = "darkblue") 
+
+e <- ggplot(modelbuilding, aes(x = property_tax_rate, y = y1)) +
+  geom_point(color = "darkblue") 
+
+f <- ggplot(modelbuilding, aes(x = Locality, y = y1)) +
+  geom_point(color = "darkblue") 
+
+g <- ggplot(modelbuilding, aes(x = Face, y = y1)) +
+  geom_point(color = "darkblue") 
+
+# divide the frame in grid using grid.arrange() and put above plots in it
+grid.arrange(a, b, c, d, e, f, g, ncol = 3, nrow = 3)
+```
+#### Model 2
+```{r fig.cap="Model 2", message=FALSE, warning=FALSE}
+lm2 <- lm(y1 ~ 0 + year)
+y2 <- lm2$residuals
+
+ggplot(modelbuilding, aes(x = y2))+
+  geom_histogram(fill = "darkblue", color = "white") 
+  
+qqnorm(y2)
+qqline(y2)
+shapiro.test(y2)
+```
+
+```{r fig.cap="Model 2 Predictor vs. Response", message=FALSE, warning=FALSE}
+# check the relationship between each predictor variable and y1
+a <- ggplot(modelbuilding, aes(x = Year, y = y2)) +
+  geom_point(color = "darkblue") 
+
+b <- ggplot(modelbuilding, aes(x = Estimated.Value, y = y2)) +
+  geom_point(color = "darkblue") 
+ 
+c <- ggplot(modelbuilding, aes(x = num_bathrooms, y = y2)) +
+  geom_point(color = "darkblue") 
+
+d <- ggplot(modelbuilding, aes(x = carpet_area, y = y2)) +
+  geom_point(color = "darkblue") 
+
+e <- ggplot(modelbuilding, aes(x = property_tax_rate, y = y2)) +
+  geom_point(color = "darkblue") 
+
+f <- ggplot(modelbuilding, aes(x = Locality, y = y2)) +
+  geom_point(color = "darkblue") 
+
+g <- ggplot(modelbuilding, aes(x = Face, y = y2)) +
+  geom_point(color = "darkblue") 
+
+# divide the frame in grid using grid.arrange() and put above plots in it
+grid.arrange(a, b, c, d, e, f, g, ncol = 3, nrow = 3)
+```
+Not much changes, log transformation of response
+### Transformation
+```{r fig.cap="Log transformation", message=FALSE, warning=FALSE}
+# perform log transformation 
+lnsp <- log(modelbuilding$Sale.Price)
+modelbuilding$lnsp <- lnsp
+modelbuilding <- modelbuilding[, -8]
+```
+
+
+```{r fig.cap="Predictors vs. lnsaleprice", message=FALSE, warning=FALSE}
+a <- ggplot(modelbuilding, aes(x = Year, y = lnsp)) +
+  geom_point(color = "darkblue") 
+
+b <- ggplot(modelbuilding, aes(x = Estimated.Value, y = lnsp)) +
+  geom_point(color = "darkblue") 
+ 
+c <- ggplot(modelbuilding, aes(x = num_bathrooms, y = lnsp)) +
+  geom_point(color = "darkblue") 
+
+d <- ggplot(modelbuilding, aes(x = carpet_area, y = lnsp)) +
+  geom_point(color = "darkblue") 
+
+e <- ggplot(modelbuilding, aes(x = property_tax_rate, y = lnsp)) +
+  geom_point(color = "darkblue") 
+
+f <- ggplot(modelbuilding, aes(x = Locality, y = lnsp)) +
+  geom_point(color = "darkblue") 
+
+g <- ggplot(modelbuilding, aes(x = Face, y = lnsp)) +
+  geom_point(color = "darkblue") 
+
+# divide the frame in grid using grid.arrange() and put above plots in it
+grid.arrange(a, b, c, d, e, f, g, ncol = 3, nrow = 3)
+```
+
+```{r fig.cap="Interaction after transformation", message=FALSE, warning=FALSE}
+# check interaction between 
+plot(ev, lnsp, type = "n")
+points(ev[L == 0], lnsp[L == 0], col="darkred")
+points(ev[L == 1], lnsp[L == 1], col="darkblue")
+```
+Similar to the results from before, the two variables overlap with different slope, suggesting a
+strong interaction between them.
+
+```{r fig.cap="Model 1 after transformation", message=FALSE, warning=FALSE}
+lm1 <- lm(lnsp ~ 0 + ev * L)
+y1 <- lm1$residuals
+
+ggplot(modelbuilding, aes(x = y1))+
+  geom_histogram(fill = "darkblue", color = "white") +
+  labs(x = "lnsp (in thousand $)", y = "count")
+qqnorm(y1)
+qqline(y1)
+shapiro.test(y1)
+```
+normality not satisfied
+
+```{r}
+a <- ggplot(modelbuilding, aes(x = Year, y = y1)) +
+  geom_point(color = "darkblue") 
+
+b <- ggplot(modelbuilding, aes(x = Estimated.Value, y = y1)) +
+  geom_point(color = "darkblue") 
+ 
+c <- ggplot(modelbuilding, aes(x = num_bathrooms, y = y1)) +
+  geom_point(color = "darkblue") 
+
+d <- ggplot(modelbuilding, aes(x = carpet_area, y = y1)) +
+  geom_point(color = "darkblue") 
+
+e <- ggplot(modelbuilding, aes(x = property_tax_rate, y = y1)) +
+  geom_point(color = "darkblue") 
+
+f <- ggplot(modelbuilding, aes(x = Locality, y = y1)) +
+  geom_point(color = "darkblue") 
+
+g <- ggplot(modelbuilding, aes(x = Face, y = y1)) +
+  geom_point(color = "darkblue") 
+
+# divide the frame in grid using grid.arrange() and put above plots in it
+grid.arrange(a, b, c, d, e, f, g, ncol = 3, nrow = 3)
+```
+
+Everthing is significant changed, except carpet_area, still show no pattern.
+
+#### Model 2
+```{r fig.cap="Model 2 after transformation", message=FALSE, warning=FALSE}
+lm2 <- lm(y1 ~ 0 + year)
+y2 <- lm2$residuals
+
+ggplot(modelbuilding, aes(x = y2))+
+  geom_histogram(fill = "darkblue", color = "white") 
+  
+qqnorm(y2)
+qqline(y2)
+shapiro.test(y2)
+```
+
+```{r}
+# check the relationship between each predictor variable and lnsp
+a <- ggplot(modelbuilding, aes(x = Year, y = y2)) +
+  geom_point(color = "darkblue") 
+
+b <- ggplot(modelbuilding, aes(x = Estimated.Value, y = y2)) +
+  geom_point(color = "darkblue") 
+ 
+c <- ggplot(modelbuilding, aes(x = num_bathrooms, y = y2)) +
+  geom_point(color = "darkblue") 
+
+d <- ggplot(modelbuilding, aes(x = carpet_area, y = y2)) +
+  geom_point(color = "darkblue") 
+
+e <- ggplot(modelbuilding, aes(x = property_tax_rate, y = y2)) +
+  geom_point(color = "darkblue") 
+
+f <- ggplot(modelbuilding, aes(x = Locality, y = y2)) +
+  geom_point(color = "darkblue") 
+
+g <- ggplot(modelbuilding, aes(x = Face, y = y2)) +
+  geom_point(color = "darkblue") 
+
+# divide the frame in grid using grid.arrange() and put above plots in it
+grid.arrange(a, b, c, d, e, f, g, ncol = 3, nrow = 3)
+```
+Take out carpet area, num_bathrooms and face
+
+#### Model 3
+```{r fig.cap="Full Model", message=FALSE, warning=FALSE}
+# fit full model
+lm3 <- lm(lnsp ~ 0+year+ev*L+ptr)
+summary(lm3)
+```
+
+
+```{r fig.cap="Full Model Assumptions", message=FALSE, warning=FALSE}
+# check the normality
+ggplot(modelbuilding, aes(x = lm3$residuals))+
+  geom_histogram(fill = "darkblue", color = "white") +
+  labs(x = "ln(Sale Price) (in thousand dollars)", y = "count")
+qqnorm(lm3$residuals)
+qqline(lm3$residuals)
+
+# Check independence
+durbinWatsonTest(lm3)
+
+# Check constant variance 
+bptest(lm3)
+
+# Check lineality
+ggplot(modelbuilding, aes(x = lm3$fitted.values, y = lm3$residuals)) +
+  geom_point(color = "darkblue") +
+  labs(x = "Fitted Values", y = "Residuals")
+shapiro.test(lm3$residuals)
+```
+
+Satisfied Linearity and constant variance, but not satisfied independence and normality assumptions.
+
+
+#### Model 4
+```{r fig.cap="Reduced Model", message=FALSE, warning=FALSE}
+# Fit reduced model
+lm4 <- lm(lnsp ~ 0+year+ev+L+ptr)
+summary(lm4)
+```
+```{r fig.cap="Full Model Assumptions", message=FALSE, warning=FALSE}
+# check the normality
+ggplot(modelbuilding, aes(x = lm4$residuals))+
+  geom_histogram(fill = "darkblue", color = "white") +
+  labs(x = "ln(Sale Price) (in thousand dollars)", y = "count")
+qqnorm(lm4$residuals)
+qqline(lm4$residuals)
+
+# Check independence
+durbinWatsonTest(lm4)
+
+# Check constant variance 
+bptest(lm4)
+
+# Check lineality
+ggplot(modelbuilding, aes(x = lm4$fitted.values, y = lm4$residuals)) +
+  geom_point(color = "darkblue") +
+  labs(x = "Fitted Values", y = "Residuals")
+shapiro.test(lm4$residuals)
+```
+### Model Comparison
+```{r}
+anova(lm3, lm4)
+```
+### Final model diagnostic
+```{r}
+vif(lm3)
+```
+

@@ -1,0 +1,852 @@
+---
+title: "STAT 183 Individual Dataset"
+author: "Chuqi(Angel) Jin"
+date: "2024-05-08"
+output:
+  pdf_document: 
+    toc: yes
+  html_document:
+    df_print: paged
+---
+***
+```{r,message=FALSE,warning=FALSE, include=FALSE}
+library(tidyverse)
+library(lubridate)
+library(dplyr)
+library(ggplot2)
+library(gridExtra)
+library(GGally)
+library(car)
+library(mltools)
+library(data.table)
+library(fastDummies)
+library(lmtest)
+library(tidyr)
+library(grid)
+```
+
+## Loading
+```{r}
+realEstate <- read.csv("D:/angelClass/ARclass/STAT_183/Individual/RealEstatePrice.csv") 
+```
+
+```{r}
+# Subset again to get the useable dataset for the model building
+# Replace all the empty value and 0 values into NA
+realEstate[realEstate == ""] = NA
+realEstate[realEstate == "?"] = NA
+realEstate[realEstate == 0] = NA
+
+# Clean the data set with selected restrictions
+cleaned <- realEstate %>%
+  na.omit() %>%
+  filter(Year >= 2017) 
+
+cleaned$Estimated.Value <- as.numeric(as.character(cleaned$Estimated.Value)) / 1000
+cleaned$Sale.Price <- as.numeric(as.character(cleaned$Sale.Price)) / 1000
+```
+
+2574 observation
+
+# DATA DESCIRPTION
+# EDA 
+```{r}
+summary(cleaned)
+sd(cleaned$Year)
+```
+
+## Date (Not include in the model building)
+```{r}
+# Identify which month sells most
+date_eda <- data.frame(date = as.Date(c(cleaned$Date)))
+date_eda$month <- format(date_eda$date, "%m")
+p1 <- ggplot(date_eda, aes(x=month)) + 
+  geom_bar(fill = "#7d9ea2", color = "white") +
+  labs(x = "Months", y = "count")
+
+# Identify which date sells most
+date_eda$day <- format(date_eda$date, "%d")
+p2 <- ggplot(date_eda, aes(x=day)) + 
+  geom_bar(fill = "#d99b77", color = "white") +
+  labs(x = "Days", y = "count")
+
+grid.arrange(p1,p2, ncol = 1)
+```
+
+## Year (Include in the model building, numerical)
+```{r}
+# Identify which year sells most
+p3 <- ggplot(cleaned, aes(x=Year)) + 
+  geom_histogram(fill = "#7d9ea2", color = "white", binwidth=1) +
+  labs(x = "Years", y = "count")
+p3
+
+y_freq <- table(cleaned$Year)
+y_rank <- sort(y_freq, decreasing = T)
+y_rank
+
+year = c(2017, 2018, 2019, 2020, 2021, 2022)
+count = c(426, 325, 488, 408, 484, 443)
+
+year_set = data.frame(year, count)
+
+ggplot(year_set, aes(x=year, y=count)) +
+  geom_line(color="black")+
+  geom_point()
+```
+
+
+## Locality (include in the model building, categorical)
+```{r}
+# Identify which year sells most
+p4 <- ggplot(cleaned, aes(x=Locality, fill=Locality)) + 
+  geom_bar(width=1) +
+  labs(x = "Localities") +
+  coord_polar()+
+  theme(panel.background = element_blank())
+p4
+```
+Bridgeport and Waterbury are top 2 location of property transaction
+
+## Estimated Value(include in the model building, numerical)
+```{r}
+p5 <-ggplot(cleaned, aes(x = Estimated.Value)) + 
+  geom_histogram(fill = "#7d9ea2", color="white")+
+  labs(x = "Estimated Value (in thousand dollars)") 
+p5
+```
+
+## Sale Price(include in the model building, Response variable)
+```{r}
+p6 <-ggplot(cleaned, aes(x = Sale.Price)) + 
+  geom_histogram(fill = "#f26835", color="white")+
+  labs(x = "Sale Price (in thousand dollars)", y = "count") 
+p6
+```
+Not normally distributed, it's right skewed.
+
+
+## Property(include in the model building, categorical)
+```{r}
+p7 <- ggplot(cleaned, aes(x = Property)) +
+  geom_bar(fill = "#7d9ea2", color="white")
+
+```
+Single family and two family are top 2 property types
+
+## Residential (include in the model building, categorical)
+```{r}
+p8 <- ggplot(cleaned, aes(x = Residential)) +
+  geom_bar(fill = "#7d9ea2", color="white")
+  
+grid.arrange(p7,p8, ncol = 1)
+```
+Detached House and Duplex are the top 2
+
+## Number of rooms (Include, numerical)
+```{r}
+p9 <- ggplot(cleaned, aes(x = num_rooms)) +
+  geom_histogram(fill = "#7d9ea2", color="white",binwidth = 1)+
+  labs(x = "Number of Rooms", y = "count")
+  
+```
+
+
+## Number of bathrooms (Include, numerical)
+```{r}
+p10 <- ggplot(cleaned, aes(x = num_bathrooms)) +
+  geom_histogram(fill = "#d99b77", color="white",binwidth = 1)+
+  labs(x = "Number of Bathrooms", y = "count")
+grid.arrange(p9,p10, ncol = 1)
+```
+
+
+## carpet area (Include, numerical)
+```{r}
+p11 <- ggplot(cleaned, aes(x = carpet_area)) + 
+  geom_histogram(fill = "#d99b77", color="white", binwidth=300)+
+  labs(x = "Carpet Area (in square feet)", y = "count")
+p11
+```
+
+## Property tax rate (Include, numerical)
+```{r}
+p12 <- ggplot(cleaned, aes(x = property_tax_rate)) + 
+  geom_histogram(fill = "#d99b77", color="white", binwidth=0.25)+
+  labs(x = "Property Tax Rate", y = "count")
+p12
+```
+
+## Face (Include, categorical)
+```{r}
+p13 <-ggplot(cleaned, aes(x = Face)) + 
+  geom_bar(fill = "#d99b77", color="white")
+p13
+```
+
+```{r}
+# Face
+# Find its frequency of Top 2 face direction
+face_freq <- table(cleaned$Face)
+face_rank <- sort(face_freq, decreasing = T)
+face_rank
+```
+North and West are top 2 facing directions
+
+
+```{r}
+summary(cleaned)
+sd(cleaned$Year)
+sd(cleaned$Estimated.Value)
+sd(cleaned$Sale.Price)
+```
+
+
+
+# Model Building Data
+```{r}
+modelData <- subset(cleaned, select = c("Year", "Locality", "Estimated.Value",
+                                      "Property", "Residential", 
+                                      "num_rooms", "num_bathrooms",
+                                      "carpet_area", "property_tax_rate", 
+                                      "Face", "Sale.Price"))
+
+
+# Subset useful data for model building
+modelData <- modelData %>%
+  filter(Locality == "Bridgeport" | Locality == "Waterbury")%>%
+  filter(Property == "Single Family" | Property == "Two Family") %>%
+  filter(Residential == "Detached House" | Residential == "Duplex")%>%
+  filter(Face == "North" | Face == "West") 
+
+```
+
+The subset dataset contains 397 observations, 11 variables
+ 
+## Response vs Predictors
+```{r, message=FALSE, warning=FALSE}
+# create graphs between each predictor var and the response var
+s.year <- ggplot(modelData, aes(x = Year, y = Sale.Price)) +
+  geom_point(color = "#990066") 
+s.estivalue <- ggplot(modelData, aes(x = Estimated.Value, y = Sale.Price)) +
+  geom_point(color = "#990066") 
+s.numroom <- ggplot(modelData, aes(x = num_rooms, y = Sale.Price)) +
+  geom_point(color = "#990066") 
+s.numbath <- ggplot(modelData, aes(x = num_bathrooms, y = Sale.Price)) +
+  geom_point(color = "#990066") 
+s.caparea <- ggplot(modelData, aes(x = carpet_area, y = Sale.Price)) +
+  geom_point(color = "#990066") 
+s.proprate <- ggplot(modelData, aes(x = property_tax_rate, y = Sale.Price)) +
+  geom_point(color = "#990066") 
+
+box.property <- ggplot(modelData, aes(x = Property, y = Sale.Price)) +
+           geom_boxplot(color = "#990066", outlier.color = "red",
+                        outlier.shape = 4, outlier.size = 2) 
+box.residential <- ggplot(modelData, aes(x = Residential, y = Sale.Price)) +
+           geom_boxplot(color = "#990066", outlier.color = "red",
+                        outlier.shape = 4, outlier.size = 2) 
+box.Locality <- ggplot(modelData, aes(x = Locality, y = Sale.Price)) +
+           geom_boxplot(color = "#990066", outlier.color = "red",
+                        outlier.shape = 4, outlier.size = 2)
+box.face <- ggplot(modelData, aes(x = Face, y = Sale.Price)) +
+           geom_boxplot(color = "#990066", outlier.color = "red",
+                        outlier.shape = 4, outlier.size = 2)
+
+# divide the frame in grid using grid.arrange() and put above plots in it
+grid.arrange(s.estivalue, s.numroom, s.numbath, s.caparea, s.proprate,
+             s.year, box.property, box.property, box.residential, box.Locality,
+             box.face, ncol = 3)
+```
+
+## Multicollinearity Analysis
+```{r fig.cap="Pairwise Comparison of the Original Data", message=FALSE, warning=FALSE}
+ggpairs(modelData) + theme(axis.text.x = element_text(size = 5, angle = 90),
+                           axis.text.y = element_text(size = 5),
+                           strip.text.y = element_text(angle = 0))
+```
+
+```{r}
+# All predictors
+property.mlr <- lm(Sale.Price ~ Year+Locality+Estimated.Value+num_rooms+ Property+num_bathrooms+carpet_area+property_tax_rate+Face+Residential, 
+data = modelData)
+
+summary(property.mlr)
+
+# Can not do the vif
+# vif(property.mlr)
+```
+
+
+```{r}
+# Remove property and residential those 2 variables
+property1.mlr <- lm(Sale.Price ~ Year+Locality+Estimated.Value+num_rooms+num_bathrooms+carpet_area+property_tax_rate+Face, 
+data = modelData)
+
+summary(property1.mlr)
+
+```
+
+```{r}
+vif(property1.mlr)
+```
+
+```{r}
+# remove 'num_rooms' predictor
+property2.mlr <- lm(Sale.Price ~ Year+Locality+Estimated.Value+num_bathrooms+carpet_area+property_tax_rate+Face, 
+data = modelData)
+
+summary(property2.mlr)
+
+```
+
+```{r}
+vif(property2.mlr)
+```
+No more multicollinearity, all less than 5
+
+### Stop for EDA
+
+```{r}
+# Model building dataset
+modelbuilding <- subset(modelData, select = c("Year", "Locality", "Estimated.Value"
+                                        , "num_bathrooms", "carpet_area", "property_tax_rate", 
+                                      "Face", "Sale.Price"))
+
+```
+
+397 obs with 8 variables
+
+### Forward Stepwise Regression 
+
+```{r, message=FALSE, warning=FALSE}
+# perform stepwise regression using the original data set
+
+# specify the null model with no predictor
+original.null <- lm(Sale.Price ~ 1, data = modelbuilding)
+# specify the full model using all of the potential predictors
+original.full <- lm(Sale.Price ~ ., data = modelbuilding)
+# use the stepwise algorithm to build a parsimonious model
+original.step <- step(original.null,
+                      scope = list(lower = original.null, upper = original.full),
+                      direction = "both", test = "F")
+
+summary(original.step)
+```
+
+# Residual Diagnostics
+```{r}
+# check linearity
+ggplot(data = original.step, aes(x = .fitted, y = .resid)) +
+  geom_point(alpha = 0.5, color = "darkblue") +
+  geom_hline(yintercept = 0, color = "red", linetype = "dashed") +
+  labs(x = "Predicted Values", y = "Residuals")
+# There is a pattern, so we look at residuals vs. each predictors
+
+# predictor: Estimated.Value
+l.ev <- ggplot(data = original.step, aes(x = Estimated.Value, y = .resid)) +
+  geom_point(alpha = 0.5, color = "darkblue") +
+  geom_hline(yintercept = 0, color = "red", linetype = "dashed") +
+  labs(x = "Estimated.Value", y = "Residuals")
+# predictor: Year
+l.year <- ggplot(data = original.step, aes(x = Year, y = .resid)) +
+  geom_point(alpha = 0.5, color = "darkblue") +
+  geom_hline(yintercept = 0, color = "red", linetype = "dashed") +
+  labs(x = "Years", y = "Residuals")
+# predictor: Locality
+l.Local <- ggplot(data = original.step, aes(x = Locality, y = .resid)) +
+  geom_point(alpha = 0.5, color = "darkblue") +
+  geom_hline(yintercept = 0, color = "red", linetype = "dashed") +
+  labs(x = "Locality", y = "Residuals")
+# predictor: Carpet Area
+l.cap <- ggplot(data = original.step, aes(x = carpet_area, y = .resid)) +
+  geom_point(alpha = 0.5, color = "darkblue") +
+  geom_hline(yintercept = 0, color = "red", linetype = "dashed") +
+  labs(x = "Carpet Area", y = "Residuals")
+
+# divide the frame in grid using grid.arrange() and put above plots in it
+grid.arrange(l.ev, l.year, l.Local, l.cap, ncol = 2, nrow = 2)
+```
+
+```{r fig.cap="Residual Diagnostics: Constant Variance", message=FALSE, warning=FALSE}
+# perform residual diagnostics on the residuals of the final stepwise model
+
+# check constant variance
+bptest(original.step)
+```
+
+p-value is extremly small, therefore, there is
+sufficient evidence to conclude the residuals do not have constant variance.
+
+```{r fig.cap="Residual Diagnostics: Normality", message=FALSE, warning=FALSE}
+# perform residual diagnostics on the residuals of the final stepwise model
+
+# check normality 
+ggplot(data = original.step, aes(x = .resid)) + 
+  geom_histogram(fill = "darkblue", color = "white") +
+  labs(x = "revenue (in thousand $)", y = "count")
+
+ggplot(data = original.step, aes(x = .resid)) + 
+  geom_boxplot(color = "darkblue", outlier.color = "red",
+               outlier.shape = 4, outlier.size = 2) +
+           labs(y = "revenue (in thousand $)")
+
+qqnorm(resid(original.step))
+qqline(resid(original.step))
+
+shapiro.test(resid(original.step))
+```
+Even though out histogram looks bell-shaped, but shapiro-wilk test p-value is too small, so normlaity also not satisfied
+
+```{r, message=FALSE, warning=FALSE}
+# perform residual diagnostics on the residuals of the final stepwise model
+
+# check independence
+durbinWatsonTest(original.step)
+```
+p-value is > 0.05, therefore, independence assumption is satisfied
+
+## Model Building and Diagnostics
+
+```{r, message=FALSE, warning=FALSE}
+
+sp <- modelbuilding$Sale.Price
+year <- modelbuilding$Year
+ev <- modelbuilding$Estimated.Value
+nb <- modelbuilding$num_bathrooms
+ca <- modelbuilding$carpet_area
+ptr <- modelbuilding$property_tax_rate
+
+# create dummy variables for each cat var
+L <- ifelse(modelbuilding$Locality == "Waterbury", 1, 0)
+face <- ifelse(modelbuilding$Face == "West", 1, 0)
+```
+
+```{r fig.cap="Initial Plots of Predictor vs. Response Variables", message=FALSE, warning=FALSE}
+# check the relationship between each predictor var and rev
+a <- ggplot(modelbuilding, aes(x = Year, y = sp)) +
+  geom_point(color = "darkblue") 
+
+b <- ggplot(modelbuilding, aes(x = Estimated.Value, y = sp)) +
+  geom_point(color = "darkblue") 
+ 
+c <- ggplot(modelbuilding, aes(x = num_bathrooms, y = sp)) +
+  geom_point(color = "darkblue") 
+
+d <- ggplot(modelbuilding, aes(x = carpet_area, y = sp)) +
+  geom_point(color = "darkblue") 
+
+e <- ggplot(modelbuilding, aes(x = property_tax_rate, y = sp)) +
+  geom_point(color = "darkblue") 
+
+f <- ggplot(modelbuilding, aes(x = Locality, y = sp)) +
+  geom_point(color = "darkblue") 
+
+g <- ggplot(modelbuilding, aes(x = Face, y = sp)) +
+  geom_point(color = "darkblue") 
+
+# divide the frame in grid using grid.arrange() and put above plots in it
+grid.arrange(a, b, c, d, e, f, g, ncol = 3, nrow = 3)
+```
+
+### Model Building
+
+```{r fig.cap="Interaction Between popularity and genres", message=FALSE, warning=FALSE}
+# check interaction between 
+plot(ev, sp, type = "n")
+points(ev[L == 0], sp[L == 0], col="red")
+points(ev[L == 1], sp[L == 1], col="green")
+```
+
+interaction yes!!!!!!
+
+```{r fig.cap="Residual Diagnostics: y1", message=FALSE, warning=FALSE}
+lm1 <- lm(sp ~ 0 + ev * L)
+y1 <- lm1$residuals
+
+ggplot(modelbuilding, aes(x = y1))+
+  geom_histogram(fill = "darkblue", color = "white") +
+  labs(x = "revenue (in thousand $)", y = "count")
+qqnorm(y1)
+qqline(y1)
+shapiro.test(y1)
+```
+Normality failed
+
+```{r fig.cap="Plots of Predictors vs. y1", message=FALSE, warning=FALSE}
+# check the relationship between each predictor variable and y1
+a <- ggplot(modelbuilding, aes(x = Year, y = y1)) +
+  geom_point(color = "darkblue") 
+
+b <- ggplot(modelbuilding, aes(x = Estimated.Value, y = y1)) +
+  geom_point(color = "darkblue") 
+ 
+c <- ggplot(modelbuilding, aes(x = num_bathrooms, y = y1)) +
+  geom_point(color = "darkblue") 
+
+d <- ggplot(modelbuilding, aes(x = carpet_area, y = y1)) +
+  geom_point(color = "darkblue") 
+
+e <- ggplot(modelbuilding, aes(x = property_tax_rate, y = y1)) +
+  geom_point(color = "darkblue") 
+
+f <- ggplot(modelbuilding, aes(x = Locality, y = y1)) +
+  geom_point(color = "darkblue") 
+
+g <- ggplot(modelbuilding, aes(x = Face, y = y1)) +
+  geom_point(color = "darkblue") 
+
+# divide the frame in grid using grid.arrange() and put above plots in it
+grid.arrange(a, b, c, d, e, f, g, ncol = 3, nrow = 3)
+```
+
+
+carpet area, num_bathrooms seems no pattern
+
+```{r fig.cap="Residual Diagnostics: y2", message=FALSE, warning=FALSE}
+lm2 <- lm(y1 ~ 0 + year)
+y2 <- lm2$residuals
+
+ggplot(modelbuilding, aes(x = y2))+
+  geom_histogram(fill = "darkblue", color = "white") 
+  
+qqnorm(y2)
+qqline(y2)
+shapiro.test(y2)
+```
+
+
+```{r fig.cap="Plots of Predictors vs. y1", message=FALSE, warning=FALSE}
+# check the relationship between each predictor variable and y1
+a <- ggplot(modelbuilding, aes(x = Year, y = y2)) +
+  geom_point(color = "darkblue") 
+
+b <- ggplot(modelbuilding, aes(x = Estimated.Value, y = y2)) +
+  geom_point(color = "darkblue") 
+ 
+c <- ggplot(modelbuilding, aes(x = num_bathrooms, y = y2)) +
+  geom_point(color = "darkblue") 
+
+d <- ggplot(modelbuilding, aes(x = carpet_area, y = y2)) +
+  geom_point(color = "darkblue") 
+
+e <- ggplot(modelbuilding, aes(x = property_tax_rate, y = y2)) +
+  geom_point(color = "darkblue") 
+
+f <- ggplot(modelbuilding, aes(x = Locality, y = y2)) +
+  geom_point(color = "darkblue") 
+
+g <- ggplot(modelbuilding, aes(x = Face, y = y2)) +
+  geom_point(color = "darkblue") 
+
+# divide the frame in grid using grid.arrange() and put above plots in it
+grid.arrange(a, b, c, d, e, f, g, ncol = 3, nrow = 3)
+```
+
+Not much changes, log transformation of response
+
+```{r fig.cap="Plots of Predictor vs. lnrev", message=FALSE, warning=FALSE}
+# perform log transformation on revenue and edit the original data set to
+# exclude revenue and include lnrev
+lnsp <- log(modelbuilding$Sale.Price)
+modelbuilding$lnsp <- lnsp
+modelbuilding <- modelbuilding[, -8]
+
+# convert cat vars genres and original language to be binary data
+modelbuilding$Locality <- L
+modelbuilding$Face <- face
+
+# check the relationship between each predictor variable and lnrev
+a <- ggplot(modelbuilding, aes(x = Year, y = lnsp)) +
+  geom_point(color = "darkblue") 
+
+b <- ggplot(modelbuilding, aes(x = Estimated.Value, y = lnsp)) +
+  geom_point(color = "darkblue") 
+ 
+c <- ggplot(modelbuilding, aes(x = num_bathrooms, y = lnsp)) +
+  geom_point(color = "darkblue") 
+
+d <- ggplot(modelbuilding, aes(x = carpet_area, y = lnsp)) +
+  geom_point(color = "darkblue") 
+
+e <- ggplot(modelbuilding, aes(x = property_tax_rate, y = lnsp)) +
+  geom_point(color = "darkblue") 
+
+f <- ggplot(modelbuilding, aes(x = Locality, y = lnsp)) +
+  geom_point(color = "darkblue") 
+
+g <- ggplot(modelbuilding, aes(x = Face, y = lnsp)) +
+  geom_point(color = "darkblue") 
+
+# divide the frame in grid using grid.arrange() and put above plots in it
+grid.arrange(a, b, c, d, e, f, g, ncol = 3, nrow = 3)
+```
+
+recheck interaction
+```{r fig.cap="Interaction Between popularity and genres", message=FALSE, warning=FALSE}
+# check interaction between 
+plot(ev, lnsp, type = "n")
+points(ev[L == 0], lnsp[L == 0], col="darkred")
+points(ev[L == 1], lnsp[L == 1], col="darkblue")
+```
+
+Similar to the results from before, the two variables overlap, suggesting a
+strong interaction between them.
+
+```{r fig.cap="Residual Diagnostics: y1", message=FALSE, warning=FALSE}
+lm1 <- lm(lnsp ~ 0 + ev * L)
+y1 <- lm1$residuals
+
+ggplot(modelbuilding, aes(x = y1))+
+  geom_histogram(fill = "darkblue", color = "white") +
+  labs(x = "lnsp (in thousand $)", y = "count")
+qqnorm(y1)
+qqline(y1)
+shapiro.test(y1)
+```
+
+No normality 
+
+```{r}
+# check the relationship between each predictor variable and lnrev
+a <- ggplot(modelbuilding, aes(x = Year, y = y1)) +
+  geom_point(color = "darkblue") 
+
+b <- ggplot(modelbuilding, aes(x = Estimated.Value, y = y1)) +
+  geom_point(color = "darkblue") 
+ 
+c <- ggplot(modelbuilding, aes(x = num_bathrooms, y = y1)) +
+  geom_point(color = "darkblue") 
+
+d <- ggplot(modelbuilding, aes(x = carpet_area, y = y1)) +
+  geom_point(color = "darkblue") 
+
+e <- ggplot(modelbuilding, aes(x = property_tax_rate, y = y1)) +
+  geom_point(color = "darkblue") 
+
+f <- ggplot(modelbuilding, aes(x = Locality, y = y1)) +
+  geom_point(color = "darkblue") 
+
+g <- ggplot(modelbuilding, aes(x = Face, y = y1)) +
+  geom_point(color = "darkblue") 
+
+# divide the frame in grid using grid.arrange() and put above plots in it
+grid.arrange(a, b, c, d, e, f, g, ncol = 3, nrow = 3)
+```
+
+everthing is good except carpet_area --> no patern
+
+
+```{r fig.cap="Residual Diagnostics: y2", message=FALSE, warning=FALSE}
+lm2 <- lm(y1 ~ 0 + year)
+y2 <- lm2$residuals
+
+ggplot(modelbuilding, aes(x = y2))+
+  geom_histogram(fill = "darkblue", color = "white") 
+  
+qqnorm(y2)
+qqline(y2)
+shapiro.test(y2)
+```
+
+```{r}
+# check the relationship between each predictor variable and lnrev
+a <- ggplot(modelbuilding, aes(x = Year, y = y2)) +
+  geom_point(color = "darkblue") 
+
+b <- ggplot(modelbuilding, aes(x = Estimated.Value, y = y2)) +
+  geom_point(color = "darkblue") 
+ 
+c <- ggplot(modelbuilding, aes(x = num_bathrooms, y = y2)) +
+  geom_point(color = "darkblue") 
+
+d <- ggplot(modelbuilding, aes(x = carpet_area, y = y2)) +
+  geom_point(color = "darkblue") 
+
+e <- ggplot(modelbuilding, aes(x = property_tax_rate, y = y2)) +
+  geom_point(color = "darkblue") 
+
+f <- ggplot(modelbuilding, aes(x = Locality, y = y2)) +
+  geom_point(color = "darkblue") 
+
+g <- ggplot(modelbuilding, aes(x = Face, y = y2)) +
+  geom_point(color = "darkblue") 
+
+# divide the frame in grid using grid.arrange() and put above plots in it
+grid.arrange(a, b, c, d, e, f, g, ncol = 3, nrow = 3)
+```
+
+```{r fig.cap="Residual Diagnostics: y3", message=FALSE, warning=FALSE}
+lm3 <- lm(y2 ~ 0 + nb)
+y3 <- lm3$residuals
+
+ggplot(modelbuilding, aes(x = y3))+
+  geom_histogram(fill = "darkblue", color = "white") +
+  labs(x = "lnrev (in thousand $)", y = "count")
+qqnorm(y3)
+qqline(y3)
+shapiro.test(y3)
+```
+
+```{r}
+# check the relationship between each predictor variable and lnrev
+a <- ggplot(modelbuilding, aes(x = Year, y = y3)) +
+  geom_point(color = "darkblue") 
+
+b <- ggplot(modelbuilding, aes(x = Estimated.Value, y = y3)) +
+  geom_point(color = "darkblue") 
+ 
+c <- ggplot(modelbuilding, aes(x = num_bathrooms, y = y3)) +
+  geom_point(color = "darkblue") 
+
+d <- ggplot(modelbuilding, aes(x = carpet_area, y = y3)) +
+  geom_point(color = "darkblue") 
+
+e <- ggplot(modelbuilding, aes(x = property_tax_rate, y = y3)) +
+  geom_point(color = "darkblue") 
+
+f <- ggplot(modelbuilding, aes(x = Locality, y = y3)) +
+  geom_point(color = "darkblue") 
+
+g <- ggplot(modelbuilding, aes(x = Face, y = y3)) +
+  geom_point(color = "darkblue") 
+
+# divide the frame in grid using grid.arrange() and put above plots in it
+grid.arrange(a, b, c, d, e, f, g, ncol = 3, nrow = 3)
+```
+
+Take out carpet area, nb and face
+
+```{r fig.cap="Residual Diagnostics: lm5", message=FALSE, warning=FALSE}
+# fit first full model
+lm4 <- lm(lnsp ~ 0+year+ev*L+ptr)
+summary(lm4)
+
+# check the residual assumptions
+ggplot(modelbuilding, aes(x = lm4$residuals))+
+  geom_histogram(fill = "darkblue", color = "white") +
+  labs(x = "lnrev (in thousand $)", y = "count")
+qqnorm(lm4$residuals)
+qqline(lm4$residuals)
+ggplot(modelbuilding, aes(x = lm4$fitted.values, y = lm4$residuals)) +
+  geom_point(color = "darkblue") +
+  labs(x = "Fitted Values", y = "Residuals")
+
+shapiro.test(lm4$residuals)
+durbinWatsonTest(lm4)
+bptest(lm4)
+```
+
+
+```{r}
+m2 <- lm(lnsp ~ 0+year+ev*L)
+summary(m2)
+```
+
+
+```{r fig.cap="Pairwise Comparison for Model 4", message=FALSE, warning=FALSE}
+# edit the data set to exclude runtime and vote average
+modelbuilding <- modelbuilding[, -c(4, 5, 7)]
+
+# create pairwise scatter plots and coefficient of correlation
+ggpairs(modelbuilding) + theme(axis.text.x = element_text(size= 2.5, angle = 90),
+                      axis.text.y = element_text(size = 2.5),
+                      strip.text.y = element_text(angle = 0))
+
+```
+
+We still have multicollinearity issues in the dataset
+```{r, message=FALSE, warning=FALSE}
+# perform forward stepwise regression and use this model as Model 6
+
+# specify a null model with no predictors
+null.model <- lm(lnsp ~ 0, data = modelbuilding)
+
+# use a stepwise algorithm to build a parsimonious model
+# null to full
+lm5 <- step(null.model,
+            scope = list(lower = null.model, upper = lm4),
+            direction = "both", test = "F")
+summary(lm5)
+
+# check the residual assumptions
+ggplot(modelbuilding, aes(x = lm5$residuals))+
+  geom_histogram(fill = "darkblue", color = "white") +
+  labs(x = "lnrev (in thousand $)", y = "count")
+qqnorm(lm5$residuals)
+qqline(lm5$residuals)
+ggplot(modelbuilding, aes(x = lm5$fitted.values, y = lm5$residuals)) +
+  geom_point(color = "darkblue") +
+  labs(x = "Fitted Values", y = "Residuals")
+
+shapiro.test(lm5$residuals)
+durbinWatsonTest(lm5)
+bptest(lm5)
+```
+Same results, so we choose model 5 as final result
+
+```{r}
+# Model Comparison
+
+# Model 1: All predictors in linear form
+m1 <- lm(lnsp ~ 0+year+ev+L+ptr)
+summary(m1)
+
+# Model 2: 
+m2 <- lm(lnsp ~ 0+year+ev*L+ptr)
+summary(m2)
+
+```
+
+```{r}
+anova(m1, m2)
+```
+
+```{r}
+vif(m2)
+```
+
+
+
+```{r}
+# check the residual assumptions
+ggplot(modelbuilding, aes(x = m1$residuals))+
+  geom_histogram(fill = "darkblue", color = "white") +
+  labs(x = "lnrev (in thousand $)", y = "count")
+qqnorm(m1$residuals)
+qqline(m1$residuals)
+ggplot(modelbuilding, aes(x = m1$fitted.values, y = m1$residuals)) +
+  geom_point(color = "darkblue") +
+  labs(x = "Fitted Values", y = "Residuals")
+
+shapiro.test(m1$residuals)
+durbinWatsonTest(m1)
+bptest(m1)
+```
+
+
+### Final Model Diagnostics
+
+```{r, message=FALSE, warning=FALSE}
+final.model <- lm(lnsp ~ 0 + ptr + ev * L + year)
+
+# non-significant F-tests with overall significant F-test
+summary(final.model)
+
+# variance inflation factor (VIF)
+vif(final.model)
+
+# check the residual assumptions
+ggplot(modelbuilding, aes(x = final.model$residuals))+
+  geom_histogram(fill = "darkblue", color = "white") +
+  labs(x = "lnrev (in thousand $)", y = "count")
+
+qqnorm(final.model$residuals)
+qqline(final.model$residuals)
+ggplot(modelbuilding, aes(x = final.model$fitted.values, y = final.model$residuals)) +
+  geom_point(color = "darkblue") +
+  labs(x = "Fitted Values", y = "Residuals")
+
+shapiro.test(final.model$residuals)
+durbinWatsonTest(final.model)
+bptest(final.model)
+```
